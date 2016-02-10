@@ -1,6 +1,11 @@
 # forward
-Reads Stdin and forwards data to a remote destination over UDP/TCP/TCP+TLS
+Reads Stdin and forwards data to a remote destination over UDP/TCP/TCP+TLS.  
 Defaults to connecting via TCP+TLS and teeing input to stdout
+
+Data is buffered until reaching a newline char before being sent over the network.  Should the connection fail to connect or the connection is lost, `forward` will not panic so the superceding process can continue uninterrupted.
+
+Future work:  
+Possibly reconnect TCP connection if lost.
 
 ### Usage
 ```shell
