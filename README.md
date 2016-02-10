@@ -1,8 +1,8 @@
 # forward
-Reads Stdin and forwards data to a remote destination over UDP/TCP/TCP+TLS.  
+Forwards StdIn data to a remote destination over UDP/TCP/TCP+TLS.  
 Defaults to connecting via TCP+TLS and teeing input to stdout
 
-Data is buffered until reaching a newline char before being sent over the network.  Should the connection fail to connect or the connection is lost, `forward` will not panic so the superceding process can continue uninterrupted.
+Data is buffered until reaching a newline char before being sent over the network.  Should the connection fail to connect or the connection is lost, `forward` will not panic so the upstream process can continue uninterrupted.
 
 Future work:  
 Possibly reconnect TCP connection if lost.
@@ -34,3 +34,10 @@ Options:
 ```shell
 ❯❯❯ go get github.com/NickSardo/forward
 ```
+
+### Why?
+Papertrail's [recommended approach](https://github.com/papertrail/remote_syslog2/issues/49) is to use `logger` with `rsyslogd`.  For the following reasons, it may be beneficial to use this instead.
+
+1.  You're using a small image of Alpine linux which doesn't have rsyslogd pre-installed
+1.  You need security but your version of `netcat` doesn't support TLS
+1.  You just want to log something quickly without syslog config
