@@ -25,6 +25,7 @@ var (
 	syslog         bool
 	syslogHostname string
 	syslogApp      string
+	syslogPriority int
 )
 
 func main() {
@@ -32,6 +33,7 @@ func main() {
 	app.Name = "forward"
 	app.Usage = "Transport StdIn lines to a remote destination over UDP, TCP, or TCP+TLS"
 	app.UsageText = "forward [global options] [syslog [syslog options]] address:port"
+	app.Version = "0.1"
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:        "udp, u",
@@ -72,8 +74,13 @@ func main() {
 				},
 				cli.StringFlag{
 					Name:        "app, a",
-					Value:       "app",
+					Value:       "logger",
 					Destination: &syslogApp,
+				},
+				cli.IntFlag{
+					Name:        "priority, p",
+					Value:       22,
+					Destination: &syslogPriority,
 				},
 			},
 		},
@@ -161,7 +168,9 @@ func forward(destination string) {
 
 func toSyslog(b *bytes.Buffer, line []byte) []byte {
 	//<22>1 2016-06-18T09:56:21Z sendername programname - - - the log message
-	b.WriteString("<22>1 ")
+	b.WriteString("<")
+	b.WriteString(strconv.Itoa(syslogPriority))
+	b.WriteString(">1 ")
 	b.WriteString(time.Now().UTC().Format(time.RFC3339) + " ")
 	b.WriteString(syslogHostname + " ")
 	b.WriteString(syslogApp + " ")
