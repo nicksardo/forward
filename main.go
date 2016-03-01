@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -11,36 +12,94 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
-	flag "github.com/ogier/pflag"
+	"github.com/codegangsta/cli"
+)
+
+var (
+	useUDP bool
+	useTLS bool
+	doTee  bool
+
+	syslog         bool
+	syslogHostname string
+	syslogApp      string
+	syslogPriority int
 )
 
 func main() {
-	// debug := flag.BoolP("debug", "d", false, "Print ")
-	useUDP := flag.BoolP("udp", "u", false, "Send via UDP (will ignore TLS)")
-	useTLS := flag.BoolP("tls", "s", true, "Connect with TLS")
-	doTee := flag.BoolP("tee", "t", true, "Tee stdin to stdout")
-	command := "forward [OPTIONS] host:port"
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "%s\n", command)
-		fmt.Fprintf(os.Stderr, "Options:\n")
-		flag.PrintDefaults()
+	app := cli.NewApp()
+	app.Name = "forward"
+	app.Usage = "Transport StdIn lines to a remote destination over UDP, TCP, or TCP+TLS"
+	app.UsageText = "forward [global options] [syslog [syslog options]] address:port"
+	app.Version = "0.1"
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:        "udp, u",
+			Usage:       "Send via UDP (will ignore TLS)",
+			Destination: &useUDP,
+		},
+		cli.BoolTFlag{
+			Name:        "tls, s",
+			Usage:       "TLS-secured TCP connection",
+			Destination: &useTLS,
+		},
+		cli.BoolTFlag{
+			Name:        "tee, t",
+			Usage:       "Tee stdin to stdout",
+			Destination: &doTee,
+		},
 	}
-	flag.Parse()
+	app.Action = func(c *cli.Context) {
+		forward(c.Args().First())
+	}
 
-	if len(flag.Args()) == 0 || !validDestination(flag.Arg(0)) {
-		flag.Usage()
+	h, _ := os.Hostname()
+	app.Commands = []cli.Command{
+		{
+			Name:      "syslog",
+			Aliases:   []string{"log"},
+			Usage:     "Wrap lines in RFC-5424 Syslog format",
+			ArgsUsage: "address:port",
+			Action: func(c *cli.Context) {
+				syslog = true
+				forward(c.Args().First())
+			},
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:        "hostname, n",
+					Value:       h,
+					Destination: &syslogHostname,
+				},
+				cli.StringFlag{
+					Name:        "app, a",
+					Value:       "logger",
+					Destination: &syslogApp,
+				},
+				cli.IntFlag{
+					Name:        "priority, p",
+					Value:       22,
+					Destination: &syslogPriority,
+				},
+			},
+		},
+	}
+
+	app.Run(os.Args)
+}
+
+func forward(destination string) {
+	if !validDestination(destination) {
 		return
 	}
-
-	destination := flag.Arg(0)
 
 	var conn net.Conn
 	var err error
 	switch {
-	case *useUDP:
+	case useUDP:
 		conn, err = net.Dial("udp", destination)
-	case !*useTLS:
+	case !useTLS:
 		conn, err = net.Dial("tcp", destination)
 	default:
 		conn, err = tls.Dial("tcp", destination, &tls.Config{})
@@ -55,13 +114,11 @@ func main() {
 
 	writers := make([]*io.PipeWriter, 0, 2)
 	wg := sync.WaitGroup{}
-	if *doTee {
+	if doTee {
 		stdOutReader, stdOutWriter := io.Pipe()
 		writers = append(writers, stdOutWriter)
 		go func() {
-			wg.Add(1)
 			io.Copy(os.Stdout, stdOutReader)
-			wg.Done()
 		}()
 	}
 	if connected {
@@ -70,12 +127,24 @@ func main() {
 		go func() {
 			wg.Add(1)
 			reader := bufio.NewReader(netReader)
+			byteBuffer := bytes.NewBuffer([]byte{})
 			for {
 				data, err := reader.ReadBytes('\n')
 				if err != nil {
 					break
 				}
-				conn.Write(data)
+
+				if syslog {
+					data = toSyslog(byteBuffer, data)
+				}
+
+				if _, err = conn.Write(data); err != nil {
+					break
+				}
+
+				if syslog {
+					byteBuffer.Reset()
+				}
 			}
 			io.Copy(ioutil.Discard, netReader)
 			wg.Done()
@@ -98,6 +167,20 @@ func main() {
 	}
 
 	wg.Wait()
+}
+
+func toSyslog(b *bytes.Buffer, line []byte) []byte {
+	//<22>1 2016-06-18T09:56:21Z sendername programname - - - the log message
+	b.WriteString("<")
+	b.WriteString(strconv.Itoa(syslogPriority))
+	b.WriteString(">1 ")
+	b.WriteString(time.Now().UTC().Format(time.RFC3339) + " ")
+	b.WriteString(syslogHostname + " ")
+	b.WriteString(syslogApp + " ")
+	b.WriteString("- - - ")
+	b.Write(line)
+
+	return b.Bytes()
 }
 
 // Basic validation test

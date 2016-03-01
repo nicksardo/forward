@@ -8,12 +8,40 @@ Future work:
 Possibly reconnect TCP connection if lost.
 
 ### Usage
-```shell
-forward [OPTIONS] host:port
-Options:
-  -t, --tee=true: Tee stdin to stdout
-  -s, --tls=true: Connect with TLS
-  -u, --udp=false: Send via UDP (will ignore TLS)
+```
+NAME:
+   forward - Transport StdIn lines to a remote destination over UDP, TCP, or TCP+TLS
+
+USAGE:
+   forward [global options] [syslog [syslog options]] address:port
+
+VERSION:
+   0.1
+
+COMMANDS:
+   syslog, log	Wrap lines in RFC-5424 Syslog format
+   help, h	Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --udp, -u		Send via UDP (will ignore TLS)
+   --tls, -s		TLS-secured TCP connection
+   --tee, -t		Tee stdin to stdout
+   --help, -h		show help
+   --version, -v	print the version
+```
+
+###### Syslog Usage
+```
+NAME:
+   forward syslog - Wrap lines in RFC-5424 Syslog format
+
+USAGE:
+   forward syslog [command options] address:port
+
+OPTIONS:
+   --hostname, -n "MBP.local"    # Uses local hostname by default
+   --app, -a "logger"           
+   --priority, -p "22"
 ```
 
 ### Example
@@ -25,7 +53,17 @@ Options:
 ❯❯❯ ./std_generator 2>&1| forward logs3.papertrailapp.com:XXXXX
 ```
 
-### Recommended calls
+##### Syslog example
+```shell
+❯❯❯ echo "Test Log Message" | forward log -n some.host.name -a worker -p 15 logs3.papertrailapp.com:XXXXX
+```
+yields
+```syslog
+<15>1 2016-02-29T09:22:48Z some.host.name worker - - - Test Log Message
+```
+
+
+### Recommended Settings
 ```shell
 ❯❯❯ set -o pipefail  # return code will any non-zero returned from any commands in the pipe
 ```
