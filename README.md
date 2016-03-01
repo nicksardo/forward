@@ -53,7 +53,7 @@ OPTIONS:
 ❯❯❯ ./std_generator 2>&1| forward logs3.papertrailapp.com:XXXXX
 ```
 
-##### Wrapping lines with syslog format
+##### Syslog example
 ```shell
 ❯❯❯ echo "Test Log Message" | forward log -n some.host.name -a worker -p 15 logs3.papertrailapp.com:XXXXX
 ```

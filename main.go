@@ -141,7 +141,10 @@ func forward(destination string) {
 				if _, err = conn.Write(data); err != nil {
 					break
 				}
-				byteBuffer.Reset()
+
+				if syslog {
+					byteBuffer.Reset()
+				}
 			}
 			io.Copy(ioutil.Discard, netReader)
 			wg.Done()
