@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 )
 
 var (
@@ -51,8 +51,9 @@ func main() {
 			Destination: &doTee,
 		},
 	}
-	app.Action = func(c *cli.Context) {
+	app.Action = func(c *cli.Context) error {
 		forward(c.Args().First())
+		return nil
 	}
 
 	h, _ := os.Hostname()
@@ -62,9 +63,10 @@ func main() {
 			Aliases:   []string{"log"},
 			Usage:     "Wrap lines in RFC-5424 Syslog format",
 			ArgsUsage: "address:port",
-			Action: func(c *cli.Context) {
+			Action: func(c *cli.Context) error {
 				syslog = true
 				forward(c.Args().First())
+				return nil
 			},
 			Flags: []cli.Flag{
 				cli.StringFlag{
