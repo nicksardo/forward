@@ -22,10 +22,11 @@ var (
 	useTLS bool
 	doTee  bool
 
-	syslog         bool
-	syslogHostname string
-	syslogApp      string
-	syslogPriority int
+	syslog             bool
+	syslogHostname     string
+	syslogApp          string
+	syslogPriority     int
+	syslogAttachHeader bool
 )
 
 func main() {
@@ -84,6 +85,11 @@ func main() {
 					Value:       22,
 					Destination: &syslogPriority,
 				},
+				cli.BoolFlag{
+					Name:        "att, x",
+					Usage:       "Attach header to message",
+					Destination: &syslogAttachHeader,
+				},
 			},
 		},
 	}
@@ -95,7 +101,6 @@ func forward(destination string) {
 	if !validDestination(destination) {
 		return
 	}
-
 	var conn net.Conn
 	var err error
 	switch {
@@ -137,7 +142,12 @@ func forward(destination string) {
 				}
 
 				if syslog {
-					data = toSyslog(byteBuffer, data)
+					if syslogAttachHeader {
+						data = toSyslog(byteBuffer, data)
+					} else {
+						byteBuffer.Write(data)
+						data = byteBuffer.Bytes()
+					}
 				}
 
 				if _, err = conn.Write(data); err != nil {
